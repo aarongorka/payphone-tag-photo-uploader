@@ -1,0 +1,28 @@
+build:
+  maxIssues: 0
+
+style:
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: false
+  MaxLineLength:
+    maxLineLength: 120
+  UnusedPrivateMember:
+    active: true
+
+complexity:
+  TooManyFunctions:
+    thresholdInObjects: 25
+  LongMethod:
+    threshold: 80
+  CyclomaticComplexMethod:
+    threshold: 20
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Test']
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false

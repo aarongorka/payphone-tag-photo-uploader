@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Payphone Tag Photos</string>
+    <string name="hint_username">Bot username (User@BotName)</string>
+    <string name="hint_password">Bot password</string>
+    <string name="hint_title">Payphone name</string>
+    <string name="hint_description">Description (optional)</string>
+    <string name="action_photo">Take photo</string>
+    <string name="action_upload">Upload</string>
+    <string name="action_save">Save credentials</string>
+    <string name="saved">Credentials saved</string>
+    <string name="uploading">Uploading…</string>
+    <string name="uploaded">Uploaded as %1$s</string>
+    <string name="failed">Failed: %1$s</string>
+    <string name="need_credentials">Enter your bot credentials first</string>
+    <string name="need_title">Enter a payphone name</string>
+    <string name="need_photo">Take a photo first</string>
+    <string name="no_camera">No camera app available</string>
+</resources>

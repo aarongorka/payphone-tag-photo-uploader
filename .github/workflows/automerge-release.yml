@@ -1,0 +1,52 @@
+name: Auto-merge release PR
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: automerge-release
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    # Only successful, explicitly dispatched CI runs on release-please branches; never fork PR runs.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Merge release PR
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open \
+            --json number,author,headRefOid,labels,isCrossRepository,files --jq '.[0] // empty')
+          [ -n "$pr" ] || { echo "No open PR for $BRANCH"; exit 0; }
+
+          ok=$(jq -r --arg sha "$HEAD_SHA" '
+            .author.login == "app/github-actions"
+            and .isCrossRepository == false
+            and .headRefOid == $sha
+            and ([.labels[].name] | index("autorelease: pending") != null)
+            and ([.files[].path] | all(. == "CHANGELOG.md" or . == ".release-please-manifest.json" or . == "app/build.gradle.kts"))
+          ' <<<"$pr")
+          [ "$ok" = true ] || { echo "::error::PR failed safety checks"; exit 1; }
+
+          number=$(jq -r .number <<<"$pr")
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "$HEAD_SHA"
+          # GITHUB_TOKEN merges don't trigger push workflows, so start the release explicitly.
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main
