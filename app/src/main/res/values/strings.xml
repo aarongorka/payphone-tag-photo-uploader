@@ -3,6 +3,7 @@
     <string name="app_name">Payphone Tag Photos</string>
     <string name="hint_username">Bot username (User@BotName)</string>
     <string name="hint_password">Bot password</string>
+    <string name="bot_password_help">Uploads use a wiki bot password, not your normal password. Log in to the wiki, open https://wiki.payphonetag.com/wiki/Special:BotPasswords, create one with the \"Upload new files\" and basic rights, then enter it here as YourUsername@BotName with the generated password.</string>
     <string name="hint_title">Payphone name</string>
     <string name="hint_description">Description (optional)</string>
     <string name="action_photo">Take photo</string>
