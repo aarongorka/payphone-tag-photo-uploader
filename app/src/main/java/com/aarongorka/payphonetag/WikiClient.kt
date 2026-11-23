@@ -17,6 +17,7 @@ class WikiClient(private val baseUrl: String = DEFAULT_BASE) {
 
     fun login(username: String, password: String) {
         val token = loginToken()
+        if (isBotUsername(username)) return botLogin(username, password, token)
         val result = postForm(
             mapOf(
                 "action" to "clientlogin",
@@ -29,6 +30,13 @@ class WikiClient(private val baseUrl: String = DEFAULT_BASE) {
         check(result.getString("status") == "PASS") {
             result.optString("message").ifBlank { "Login failed (${result.getString("status")})" }
         }
+    }
+
+    private fun botLogin(username: String, password: String, token: String) {
+        val result = postForm(
+            mapOf("action" to "login", "lgname" to username, "lgpassword" to password, "lgtoken" to token),
+        ).getJSONObject("login")
+        check(result.getString("result") == "Success") { result.optString("reason", "Bot login failed") }
     }
 
     fun uploadPhoto(payphoneId: String, type: PhotoType, caption: String, file: File) {
@@ -111,6 +119,8 @@ class WikiClient(private val baseUrl: String = DEFAULT_BASE) {
 
     companion object {
         const val DEFAULT_BASE = "https://wiki.payphonetag.com"
+
+        fun isBotUsername(username: String) = '@' in username
         private const val USER_AGENT = "PayphoneTagPhotoUploader (Android)"
         private const val TIMEOUT_MS = 30_000
         private const val HTTP_OK = 200

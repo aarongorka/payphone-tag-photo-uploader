@@ -4,7 +4,7 @@ Android app to quickly photograph a payphone and upload it to the [Payphone Tag 
 
 ## Use
 
-1. Enter your wiki username and password and save (no 2FA or login CAPTCHA).
+1. Enter your wiki username and password (no 2FA or login CAPTCHA), or a [bot password](https://wiki.payphonetag.com/wiki/Special:BotPasswords) as `User@BotName`, and save.
 2. Open a wiki `Special:AddPayphonePhoto/<ID>` link (choose this app), or share the URL to it, to prefill the payphone ID.
 3. **Take photo**, pick the type, **Upload**. New contributors' photos await moderation.
 

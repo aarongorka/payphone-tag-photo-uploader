@@ -3,7 +3,7 @@
     <string name="app_name">Payphone Tag Photos</string>
     <string name="hint_username">Wiki username</string>
     <string name="hint_password">Wiki password</string>
-    <string name="bot_password_help">Log in with your normal wiki account. Accounts with two-factor authentication or a CAPTCHA at login are not supported. New contributors\' photos are held for moderator review.</string>
+    <string name="bot_password_help">Log in with your normal wiki account (no two-factor authentication or login CAPTCHA), or a bot password as User@BotName (create one at https://wiki.payphonetag.com/wiki/Special:BotPasswords). New contributors\' photos are held for moderator review.</string>
     <string name="hint_id">Payphone ID</string>
     <string name="hint_type">Photo type</string>
     <string name="hint_caption">Caption (optional)</string>
