@@ -29,19 +29,57 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # Pushes made with GITHUB_TOKEN don't trigger CI, so run it explicitly on the release PR branch.
-  ci:
+  # Pushes made with GITHUB_TOKEN don't trigger CI, so run it explicitly on the release PR branch,
+  # then merge the PR once it passes. (workflow_run doesn't fire for token-dispatched runs.)
+  ci-and-merge:
     needs: release-please
     if: needs.release-please.outputs.pr_branch != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     permissions:
       actions: write
+      contents: write
+      pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
       BRANCH: ${{ needs.release-please.outputs.pr_branch }}
     steps:
-      - run: gh workflow run ci.yml --ref "$BRANCH" --repo "$GITHUB_REPOSITORY"
+      - name: Run CI on release branch
+        run: |
+          set -euo pipefail
+          start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run ci.yml --ref "$BRANCH" --repo "$GITHUB_REPOSITORY"
+          run_id=
+          for _ in $(seq 30); do
+            sleep 5
+            run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$BRANCH" \
+              --event workflow_dispatch --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"$start\")] | first | .databaseId // empty")
+            [ -n "$run_id" ] && break
+          done
+          [ -n "$run_id" ] || { echo "::error::CI run not found"; exit 1; }
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+          echo "HEAD_SHA=$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)" >> "$GITHUB_ENV"
+      - name: Merge release PR
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open \
+            --json number,author,headRefOid,labels,isCrossRepository,files --jq '.[0] // empty')
+          [ -n "$pr" ] || { echo "No open PR for $BRANCH"; exit 0; }
+
+          ok=$(jq -r --arg sha "$HEAD_SHA" '
+            .author.login == "app/github-actions"
+            and .isCrossRepository == false
+            and .headRefOid == $sha
+            and ([.labels[].name] | index("autorelease: pending") != null)
+            and ([.files[].path] | all(. == "CHANGELOG.md" or . == ".release-please-manifest.json" or . == "app/build.gradle.kts"))
+          ' <<<"$pr")
+          [ "$ok" = true ] || { echo "::error::PR failed safety checks"; exit 1; }
+
+          number=$(jq -r .number <<<"$pr")
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "$HEAD_SHA"
+          # GITHUB_TOKEN merges don't trigger push workflows, so start the release explicitly.
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main
 
   publish:
     needs: release-please
