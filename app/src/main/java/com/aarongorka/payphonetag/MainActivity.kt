@@ -1,9 +1,10 @@
 package com.aarongorka.payphonetag
 
+import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -11,9 +12,6 @@ import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import com.aarongorka.payphonetag.databinding.ActivityMainBinding
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -48,7 +46,18 @@ class MainActivity : AppCompatActivity() {
             settings.password = binding.password.text.toString().trim()
             toast(getString(R.string.saved))
         }
+        binding.photoType.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            PhotoType.entries.map { it.label },
+        )
+        if (savedInstanceState == null) handleIntent(intent)
         if (!settings.hasCredentials) binding.status.setText(R.string.need_credentials)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -74,17 +83,21 @@ class MainActivity : AppCompatActivity() {
         binding.takePhoto.setText(R.string.action_photo)
     }
 
+    private fun handleIntent(intent: Intent?) {
+        val source = intent?.dataString ?: intent?.getStringExtra(Intent.EXTRA_TEXT)
+        PayphoneIds.parse(source)?.let { binding.payphoneId.setText(it) }
+    }
+
     private fun upload() {
         val file = photo?.takeIf { it.exists() && it.length() > 0 }
-        val title = binding.title.text.toString()
+        val id = PayphoneIds.parse(binding.payphoneId.text.toString())
         when {
             !settings.hasCredentials -> return toast(getString(R.string.need_credentials))
             file == null -> return toast(getString(R.string.need_photo))
-            title.isBlank() -> return toast(getString(R.string.need_title))
+            id == null -> return toast(getString(R.string.need_id))
         }
-        val stamp = SimpleDateFormat("yyyy-MM-dd HHmmss", Locale.ROOT).format(Date())
-        val name = FileNames.forPhoto(title, stamp)
-        val text = "${binding.description.text.toString().trim()}\n\nPayphone: $title".trim()
+        val type = PhotoType.entries[binding.photoType.selectedItemPosition]
+        val caption = binding.caption.text.toString().trim()
 
         setBusy(true)
         binding.status.setText(R.string.uploading)
@@ -92,17 +105,16 @@ class MainActivity : AppCompatActivity() {
             val result = runCatching {
                 val client = WikiClient()
                 client.login(settings.username, settings.password)
-                client.upload(file!!, name, text, "Uploaded via Payphone Tag Photos app")
+                client.uploadPhoto(id!!, type, caption, file!!)
             }
             runOnUiThread {
                 setBusy(false)
                 result.onSuccess {
-                    binding.status.text = getString(R.string.uploaded, name)
+                    binding.status.text = getString(R.string.uploaded, id)
                     file?.delete()
                     photo = null
                     binding.preview.isVisible = false
-                    binding.title.text = null
-                    binding.description.text = null
+                    binding.caption.text = null
                 }.onFailure { binding.status.text = getString(R.string.failed, it.message) }
             }
         }

@@ -30,22 +30,28 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="@string/hint_title">
+            android:hint="@string/hint_id">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/title"
+                android:id="@+id/payphoneId"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapWords" />
+                android:inputType="textCapCharacters" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <Spinner
+            android:id="@+id/photoType"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:contentDescription="@string/hint_type" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/hint_description">
+            android:hint="@string/hint_caption">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/description"
+                android:id="@+id/caption"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textMultiLine|textCapSentences" />

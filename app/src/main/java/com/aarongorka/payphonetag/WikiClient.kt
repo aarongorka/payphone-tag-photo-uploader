@@ -10,70 +10,78 @@ import java.net.URL
 import java.net.URLEncoder
 import java.util.UUID
 
-class WikiClient(private val apiUrl: String = DEFAULT_API) {
+class WikiClient(private val baseUrl: String = DEFAULT_BASE) {
     private val cookies = CookieManager(null, CookiePolicy.ACCEPT_ALL)
 
+    private class Response(val code: Int, val text: String)
+
     fun login(username: String, password: String) {
-        val token = tokenOf("login")
-        val result = post(
-            mapOf("action" to "login", "lgname" to username, "lgpassword" to password, "lgtoken" to token),
-        ).getJSONObject("login")
-        check(result.getString("result") == "Success") { result.optString("reason", "Login failed") }
+        val token = loginToken()
+        val result = postForm(
+            mapOf(
+                "action" to "clientlogin",
+                "username" to username,
+                "password" to password,
+                "logintoken" to token,
+                "loginreturnurl" to baseUrl,
+            ),
+        ).getJSONObject("clientlogin")
+        check(result.getString("status") == "PASS") {
+            result.optString("message").ifBlank { "Login failed (${result.getString("status")})" }
+        }
     }
 
-    fun upload(file: File, fileName: String, pageText: String, comment: String): String {
-        val token = tokenOf("csrf")
-        val fields = mapOf(
-            "action" to "upload",
-            "format" to "json",
-            "filename" to fileName,
-            "text" to pageText,
-            "comment" to comment,
-            "token" to token,
-        )
-        val response = multipart(fields, file, fileName)
-        response.optJSONObject("error")?.let { error(it.optString("info", "Upload failed")) }
-        val upload = response.getJSONObject("upload")
-        check(upload.getString("result") == "Success") { "Upload rejected: ${upload.opt("warnings") ?: upload}" }
-        return upload.getJSONObject("imageinfo").getString("descriptionurl")
-    }
+    fun uploadPhoto(payphoneId: String, type: PhotoType, caption: String, file: File) {
+        val pageUrl = "$baseUrl/index.php?title=Special:AddPayphonePhoto/${enc(payphoneId)}"
+        val page = request(pageUrl, "GET", null, null)
+        check(page.code == HTTP_OK) { "Could not open upload page (HTTP ${page.code})" }
+        val token = TOKEN_PATTERN.find(page.text)?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() }
+        checkNotNull(token) { "Upload form not found; are you logged in?" }
 
-    private fun tokenOf(type: String): String {
-        val json = get("action=query&meta=tokens&format=json&type=$type")
-        return json.getJSONObject("query").getJSONObject("tokens").getString("${type}token")
-    }
-
-    private fun get(query: String): JSONObject = send("$apiUrl?$query", "GET", null, null)
-
-    private fun post(params: Map<String, String>): JSONObject {
-        val body = (params + ("format" to "json")).entries.joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
-        return send(apiUrl, "POST", "application/x-www-form-urlencoded", body.toByteArray())
-    }
-
-    private fun multipart(fields: Map<String, String>, file: File, fileName: String): JSONObject {
         val boundary = "----${UUID.randomUUID()}"
         val out = ByteArrayOutputStream()
         fun write(text: String) = out.write(text.toByteArray())
-        fields.forEach { (k, v) ->
-            write("--$boundary\r\nContent-Disposition: form-data; name=\"$k\"\r\n\r\n$v\r\n")
-        }
+        mapOf(
+            "wpType" to type.value,
+            "wpCaption" to caption,
+            "wpFormSubmitted" to "1",
+            "wpEditToken" to unescape(token),
+            "wpUpload" to "Upload",
+        ).forEach { (k, v) -> write("--$boundary\r\nContent-Disposition: form-data; name=\"$k\"\r\n\r\n$v\r\n") }
         write(
-            "--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"${enc(fileName)}\"\r\n" +
+            "--$boundary\r\nContent-Disposition: form-data; name=\"wpFile\"; filename=\"photo.jpg\"\r\n" +
                 "Content-Type: image/jpeg\r\n\r\n",
         )
         out.write(file.readBytes())
         write("\r\n--$boundary--\r\n")
-        return send(apiUrl, "POST", "multipart/form-data; boundary=$boundary", out.toByteArray())
+
+        val response = request(pageUrl, "POST", "multipart/form-data; boundary=$boundary", out.toByteArray())
+        if (response.code in HTTP_REDIRECTS) return
+        val reason = ERROR_PATTERN.find(response.text)?.groupValues?.get(1)?.let(::stripTags)
+        error(reason?.takeIf { it.isNotBlank() } ?: "Upload not accepted (HTTP ${response.code})")
     }
 
-    private fun send(url: String, method: String, contentType: String?, body: ByteArray?): JSONObject {
+    private fun loginToken(): String {
+        val url = "$baseUrl/api.php?action=query&meta=tokens&format=json&type=login"
+        val json = JSONObject(request(url, "GET", null, null).text)
+        return json.getJSONObject("query").getJSONObject("tokens").getString("logintoken")
+    }
+
+    private fun postForm(params: Map<String, String>): JSONObject {
+        val body = (params + ("format" to "json")).entries.joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
+        val response = request("$baseUrl/api.php", "POST", "application/x-www-form-urlencoded", body.toByteArray())
+        check(response.code == HTTP_OK) { "HTTP ${response.code}" }
+        return JSONObject(response.text)
+    }
+
+    private fun request(url: String, method: String, contentType: String?, body: ByteArray?): Response {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method
+            connection.instanceFollowRedirects = false
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = TIMEOUT_MS
             connection.setRequestProperty("User-Agent", USER_AGENT)
-            connection.setRequestProperty("Accept", "application/json")
             cookies.get(connection.url.toURI(), emptyMap()).forEach { (name, values) ->
                 if (name.equals("Cookie", ignoreCase = true)) {
                     connection.setRequestProperty("Cookie", values.joinToString("; "))
@@ -87,10 +95,8 @@ class WikiClient(private val apiUrl: String = DEFAULT_API) {
             }
             val code = connection.responseCode
             cookies.put(connection.url.toURI(), connection.headerFields.filterKeys { it != null })
-            val stream = if (code in HTTP_OK_RANGE) connection.inputStream else connection.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            check(code in HTTP_OK_RANGE) { "HTTP $code" }
-            return JSONObject(text)
+            val stream = if (code < HTTP_ERROR) connection.inputStream else connection.errorStream
+            return Response(code, stream?.bufferedReader()?.use { it.readText() }.orEmpty())
         } finally {
             connection.disconnect()
         }
@@ -98,10 +104,21 @@ class WikiClient(private val apiUrl: String = DEFAULT_API) {
 
     private fun enc(value: String) = URLEncoder.encode(value, "UTF-8")
 
+    private fun unescape(value: String) = value.replace("&#43;", "+").replace("&amp;", "&").replace("&quot;", "\"")
+
+    private fun stripTags(html: String) =
+        unescape(html.replace(Regex("<[^>]*>"), " ")).replace(Regex("\\s+"), " ").trim()
+
     companion object {
-        const val DEFAULT_API = "https://wiki.payphonetag.com/api.php"
+        const val DEFAULT_BASE = "https://wiki.payphonetag.com"
         private const val USER_AGENT = "PayphoneTagPhotoUploader (Android)"
         private const val TIMEOUT_MS = 30_000
-        private val HTTP_OK_RANGE = 200..299
+        private const val HTTP_OK = 200
+        private const val HTTP_ERROR = 400
+        private val HTTP_REDIRECTS = 301..303
+        private val TOKEN_PATTERN =
+            Regex("""name="wpEditToken"[^>]*value="([^"]+)"|value="([^"]+)"[^>]*name="wpEditToken"""")
+        private val ERROR_PATTERN =
+            Regex("""<div[^>]*class="[^"]*error[^"]*"[^>]*>(.*?)</div>""", RegexOption.DOT_MATCHES_ALL)
     }
 }
