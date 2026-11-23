@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/aarongorka/payphone-tag-photo-uploader/compare/v1.2.0...v1.3.0) (2026-11-23)
+
+
+### Features
+
+* support bot password login alongside regular login ([9c085b2](https://github.com/aarongorka/payphone-tag-photo-uploader/commit/9c085b24e42bcb515b1bdadf53c54e8bbb74810a))
+
 ## [1.2.0](https://github.com/aarongorka/payphone-tag-photo-uploader/compare/v1.1.0...v1.2.0) (2026-11-23)
 
 
