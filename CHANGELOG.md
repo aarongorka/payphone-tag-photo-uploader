@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/aarongorka/payphone-tag-photo-uploader/compare/v1.0.0...v1.0.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **ci:** merge release PR from release workflow ([2be8a2b](https://github.com/aarongorka/payphone-tag-photo-uploader/commit/2be8a2bc736e5e1033a74f859d01fc7f843a35bc))
+
 ## 1.0.0 (2026-11-22)
 
 
