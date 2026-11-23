@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
-val appVersion = "1.0.1" // x-release-please-version
+val appVersion = "1.1.0" // x-release-please-version
 val versionParts = appVersion.split(".").map { it.toInt() }
 
 android {
