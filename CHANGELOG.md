@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/aarongorka/payphone-tag-photo-uploader/compare/v1.1.0...v1.2.0) (2026-11-23)
+
+
+### Features
+
+* upload via Special:AddPayphonePhoto and open from wiki links ([e444521](https://github.com/aarongorka/payphone-tag-photo-uploader/commit/e444521ed3c3ba50837ee9080f480d2ad985dc5c))
+
 ## [1.1.0](https://github.com/aarongorka/payphone-tag-photo-uploader/compare/v1.0.1...v1.1.0) (2026-11-23)
 
 
